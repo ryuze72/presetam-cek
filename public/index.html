@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AM Preset Finder</title>
+<style>
+:root{--bg:#050505;--card:#0c0c0c;--text:#f2f2f3;--muted:#8a8a8e;--accent:#05FAA8;--dim:rgba(5,250,168,.15);--err:#ff5c5c;--radius:14px}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+.shell{max-width:720px;margin:0 auto;padding:32px 20px 80px}
+header{text-align:center;margin-bottom:40px}.brand{font-size:1.35rem;font-weight:700}.tag{color:var(--muted);font-size:.9rem}
+h1{font-size:1.6rem;margin-bottom:20px;color:var(--accent)}
+.tabs{display:flex;gap:8px;margin-bottom:16px;background:var(--card);padding:6px;border-radius:12px;border:1px solid #1a1a1a}
+.tab{flex:1;padding:12px;border:none;background:transparent;color:var(--muted);font-weight:600;border-radius:8px;cursor:pointer}
+.tab.active{background:#111;color:var(--text)}
+.row{display:flex;gap:10px;margin-bottom:20px}
+.input-wrap{flex:1;display:flex;align-items:center;background:var(--card);border:1px solid #1a1a1a;border-radius:var(--radius);padding:0 12px}
+.input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--dim)}
+input{flex:1;background:transparent;border:none;outline:none;color:var(--text);padding:14px 8px;font-size:.95rem}
+button.primary{background:var(--accent);color:#000;border:none;border-radius:var(--radius);padding:0 24px;font-weight:700;cursor:pointer;min-width:110px}
+button.primary:disabled{opacity:.6}
+.how{background:var(--card);border:1px solid #1a1a1a;border-radius:var(--radius);padding:20px;color:var(--muted);font-size:.9rem}
+.how h2{color:var(--accent);font-size:.75rem;letter-spacing:.08em;margin-bottom:12px;text-transform:uppercase}
+.how li{margin:8px 0;list-style:none;display:flex;gap:10px}
+.num{width:24px;height:24px;border-radius:50%;background:var(--dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0}
+.run{text-align:center;padding:48px 20px}
+.spinner{width:36px;height:36px;border:3px solid #1a1a1a;border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 16px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err{background:rgba(255,92,92,.08);border:1px solid rgba(255,92,92,.25);border-radius:var(--radius);padding:16px;color:var(--err);font-size:.9rem}
+.card{background:var(--card);border:1px solid #1a1a1a;border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card a{color:var(--accent);word-break:break-all;font-size:.85rem}
+.copy{background:var(--dim);color:var(--accent);border:none;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;margin-left:8px}
+.cand{display:flex;gap:12px;cursor:pointer}.cand:hover{border-color:var(--accent)}
+.thumb{width:64px;height:80px;border-radius:8px;object-fit:cover;background:#111;flex-shrink:0}
+footer{margin-top:48px;padding-top:20px;border-top:1px solid #1a1a1a;font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+<div class="brand">AM Preset Finder</div>
+<p class="tag">Find Alight Motion presets from any TikTok link</p>
+</header>
+<h1>Find preset links</h1>
+<div class="tabs">
+<button class="tab active" id="tab-url" onclick="setMode('url')">URL Video</button>
+<button class="tab" id="tab-search" onclick="setMode('search')">Cari Preset</button>
+</div>
+<div id="panel-url">
+<form onsubmit="return doFind(event)">
+<div class="row">
+<div class="input-wrap"><input id="tt" type="url" placeholder="https://vt.tiktok.com/xxx"/></div>
+<button class="primary" id="btn-url" type="submit">Search</button>
+</div>
+</form>
+</div>
+<div id="panel-search" style="display:none">
+<form onsubmit="return doSearch(event)">
+<div class="row">
+<div class="input-wrap"><input id="kw" type="text" placeholder="Cari nama lagu atau kata kunci..."/></div>
+<button class="primary" id="btn-search" type="submit">Search</button>
+</div>
+</form>
+</div>
+<div id="state-how" class="how">
+<h2>Step by step</h2>
+<ol>
+<li><span class="num">1</span>Paste a TikTok video link</li>
+<li><span class="num">2</span>Scan video, bio and comments</li>
+<li><span class="num">3</span>Preset links extracted automatically</li>
+<li><span class="num">4</span>Copy the preset you need</li>
+</ol>
+</div>
+<div id="state-running" class="run" style="display:none"><div class="spinner"></div><p id="run-text">Sedang mencari...</p></div>
+<div id="state-error" class="err" style="display:none"></div>
+<div id="state-results" style="display:none"></div>
+<footer>Not affiliated with TikTok or Alight Motion. Clone for learning.</footer>
+</div>
+<script>
+function setMode(m){
+  const isUrl=m==='url';
+  document.getElementById('tab-url').classList.toggle('active',isUrl);
+  document.getElementById('tab-search').classList.toggle('active',!isUrl);
+  document.getElementById('panel-url').style.display=isUrl?'block':'none';
+  document.getElementById('panel-search').style.display=isUrl?'none':'block';
+  reset();
+}
+function reset(){
+  document.getElementById('state-how').style.display='block';
+  document.getElementById('state-running').style.display='none';
+  document.getElementById('state-error').style.display='none';
+  document.getElementById('state-results').style.display='none';
+  document.getElementById('state-results').innerHTML='';
+}
+function showRun(t){
+  document.getElementById('state-how').style.display='none';
+  document.getElementById('state-error').style.display='none';
+  document.getElementById('state-results').style.display='none';
+  document.getElementById('state-running').style.display='block';
+  document.getElementById('run-text').textContent=t||'Sedang mencari...';
+}
+function showErr(m){
+  document.getElementById('state-running').style.display='none';
+  document.getElementById('state-how').style.display='none';
+  const e=document.getElementById('state-error');
+  e.style.display='block';e.textContent=m;
+}
+function showRes(html){
+  document.getElementById('state-running').style.display='none';
+  document.getElementById('state-how').style.display='none';
+  document.getElementById('state-error').style.display='none';
+  const r=document.getElementById('state-results');
+  r.style.display='block';r.innerHTML=html;
+}
+async function readSSE(res){
+  const reader=res.body.getReader();
+  const dec=new TextDecoder();
+  let buf='',result=null,candidates=null,lastErr=null;
+  while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    const parts=buf.split('\n\n');buf=parts.pop()||'';
+    for(const part of parts){
+      let event='message',data='';
+      for(const line of part.split('\n')){
+        if(line.startsWith('event:'))event=line.slice(6).trim();
+        if(line.startsWith('data:'))data=line.slice(5).trim();
+      }
+      if(event==='log'&&data) document.getElementById('run-text').textContent=data.replace(/^\"|\"$/g,'');
+      if(event==='error'&&data){try{lastErr=JSON.parse(data)}catch{lastErr={message:data}}}
+      if(event==='result'&&data){try{result=JSON.parse(data)}catch{}}
+      if(event==='candidates'&&data){try{candidates=JSON.parse(data)}catch{}}
+    }
+  }
+  return {result,candidates,lastErr};
+}
+async function doFind(e){
+  e.preventDefault();
+  const url=document.getElementById('tt').value.trim();
+  if(!url){showErr('Masukkan link TikTok dulu.');return false;}
+  const btn=document.getElementById('btn-url');btn.disabled=true;btn.textContent='Searching...';
+  showRun('Resolve video...');
+  try{
+    const res=await fetch('/api/find?url='+encodeURIComponent(url));
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const {result,lastErr}=await readSSE(res);
+    if(lastErr&&!result) throw new Error(lastErr.message||'Gagal');
+    if(!result) throw new Error('Tidak ada hasil');
+    const links=result.presetLinks||[];
+    let html='<p style="color:var(--muted);margin-bottom:12px">Ditemukan <b style="color:var(--accent)">'+links.length+'</b> preset'+(result.author?' · '+result.author:'')+'</p>';
+    if(!links.length) html+='<div class="card">Tidak ditemukan link preset.</div>';
+    else links.forEach(p=>{
+      html+='<div class="card"><div style="font-weight:600;margin-bottom:6px">'+(p.title||'Preset')+'</div>';
+      if(p.type) html+='<span style="background:var(--dim);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:.75rem">'+p.type+'</span> ';
+      html+='<div style="margin-top:8px;display:flex;align-items:center"><a href="'+p.url+'" target="_blank" rel="noopener">'+p.url+'</a>';
+      html+='<button class="copy" onclick="navigator.clipboard.writeText(\''+p.url.replace(/'/g,"\\'")+'\');this.textContent=\'Copied!\'">Copy</button></div></div>';
+    });
+    showRes(html);
+  }catch(err){showErr(err.message||'Error');}
+  finally{btn.disabled=false;btn.textContent='Search';}
+  return false;
+}
+async function doSearch(e){
+  e.preventDefault();
+  const q=document.getElementById('kw').value.trim();
+  if(!q){showErr('Masukkan kata kunci.');return false;}
+  const btn=document.getElementById('btn-search');btn.disabled=true;btn.textContent='Searching...';
+  showRun('Mencari "'+q+'"...');
+  try{
+    const res=await fetch('/api/search?q='+encodeURIComponent(q));
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const {candidates}=await readSSE(res);
+    const items=(candidates&&candidates.items)||[];
+    if(!items.length){showRes('<div class="card">Tidak ada hasil. Coba keyword lain.</div>');return false;}
+    let html='<p style="color:var(--muted);margin-bottom:12px"><b style="color:var(--accent)">'+items.length+'</b> video — klik untuk ambil preset</p>';
+    items.slice(0,15).forEach(v=>{
+      html+='<div class="card cand" onclick="useUrl(\''+(v.url||'').replace(/'/g,"\\'")+'\')">';
+      if(v.thumb) html+='<img class="thumb" src="'+v.thumb+'" loading="lazy" onerror="this.style.display=\'none\'"/>';
+      html+='<div><div style="color:var(--accent);font-size:.8rem;font-weight:600">'+(v.handle||'')+'</div>';
+      html+='<div style="font-size:.85rem;color:var(--muted)">'+(v.snippet||'')+'</div></div></div>';
+    });
+    showRes(html);
+  }catch(err){showErr(err.message||'Error');}
+  finally{btn.disabled=false;btn.textContent='Search';}
+  return false;
+}
+function useUrl(u){setMode('url');document.getElementById('tt').value=u;document.querySelector('#panel-url form').requestSubmit();}
+</script>
+</body>
+</html>
